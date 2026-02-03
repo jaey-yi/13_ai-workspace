@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        max-width: 480px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+      }
+      section {
+        margin-bottom: 2rem;
+      }
+      section h2 {
+        font-size: 1.1rem;
+        margin-bottom: 0.5rem;
+      }
+      textarea {
+        width: 100%;
+        height: 80px;
+        box-sizing: border-box;
+        padding: 8px;
+      }
+      button {
+        margin-top: 8px;
+        padding: 8px 16px;
+        cursor: pointer;
+      }
+      .result {
+        margin-top: 12px;
+        padding: 8px;
+        min-height: 1.5em;
+      }
+      .status {
+        margin-top: 4px;
+        font-size: 0.9em;
+        color: #666;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- 1) 감정 분석 -->
+    <section>
+      <h1>감정 분석</h1>
+      <p>문장을 입력한 뒤 [분석] 버튼을 누르세요. (영어 문장에 적합)</p>
+
+      <textarea id="textInput" placeholder="예: I love this!"></textarea><br />
+      <button id="btnAnalyze">분석</button>
+
+      <div id="analyzeStatus" class="status"></div>
+      <div id="analyzeResult" class="result"></div>
+    </section>
+
+    <script type="module">
+      import { pipeline } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3/dist/transformers.min.js";
+
+      const textInput = document.getElementById("textInput");
+      const analyzeStatus = document.getElementById("analyzeStatus");
+      const analyzeResult = document.getElementById("analyzeResult");
+
+      // pipeline 함수를 통해 "감정분석"테스크의 모델 가져오기
+      let classifier = null;
+      async function getClassifier() {
+        if (classifier) return classifier;
+        // null 일때만,
+        analyzeStatus.textContent = "모델 로딩중";
+        classifier = await pipeline("sentiment-analysis");
+        return classifier;
+      }
+
+      // 분석 클릭시 실행할 함수
+      async function analayze() {
+        try {
+          //1_ 감정분석 파이프라인 모델 가져오기
+          const pipe = await getClassifier();
+          //2_ 추론 > 감정 분석 수행
+          const output = await pipe(textInput.value.trim());
+          //3_ 결과처리
+          console.log(output);
+          const result = Array.isArray(output) ? output[0] : output;
+          if (result) {
+            analyzeResult.textContent = `${result.label} (${(result.score * 100).toFixed(1)}%)`;
+          } else {
+            analyzeResult.textContent = "결과 없음";
+          }
+        } catch (error) {
+          analyzeResult.textContent = "오류: " + error.message;
+        }
+      }
+
+      document.getElementById("btnAnalyze").addEventListener("click", analayze);
+    </script>
+
+    <hr />
+
+    <section>
+      <h2>번역 (한글 → 영어)</h2>
+      <p>한글 문장을 입력한 뒤 [번역] 버튼을 누르세요.</p>
+
+      <textarea
+        id="translateInput"
+        placeholder="예: 오늘 기분이 정말 좋아요"
+      ></textarea
+      ><br />
+      <button id="btnTranslate">번역</button>
+
+      <div id="translateStatus" class="status"></div>
+      <div id="translateResult" class="result"></div>
+    </section>
+
+    <script type="module">
+      // 트랜스포머 라이브러리 가져오기 - pipeline 함수
+      import { pipeline } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3/dist/transformers.min.js";
+
+      const translateInput = document.getElementById("translateInput");
+      const translateStatus = document.getElementById("translateStatus");
+      const translateResult = document.getElementById("translateResult");
+
+      let translator = null;
+      async function getTranslator() {
+        if (translator) return translator;
+
+        translateStatus.textContent = "모델 실행중";
+        translator = await pipeline(
+          "translation",
+          "Xenova/nllb-200-distilled-600M",
+          {
+            progress_callback: (progress) => {
+              console.log(progress);
+              if (progress.status === "progress") {
+                const percent = Math.round(progress.progress);
+                translateStatus.textContent = `${progress.file} 다운로드 중... ${percent}%`;
+              }
+              if (progress.status === "done") return;
+            },
+          },
+        );
+        translateStatus.textContent = "";
+        return translator;
+      }
+      async function translate() {
+        try {
+          // 파이프 라인 준비
+          const pipe = await getTranslator();
+          // 번역
+          const output = await pipe(translateInput.value.trim(), {
+            src_lang: "kor_Hang",
+            tgt_lang: "eng_Latn",
+          });
+          const result = Array.isArray(output) ? output[0] : output;
+          if (result && result.translation_text) {
+            translateResult.textContent = result.translation_text;
+          } else {
+            translateResult.textContent = " 결과 없음";
+          }
+        } catch (error) {
+          translateResult.textContent = "오류:" + error.message;
+        }
+      }
+      document
+        .getElementById("btnTranslate")
+        .addEventListener("click", translate);
+    </script>
+  </body>
+</html>
