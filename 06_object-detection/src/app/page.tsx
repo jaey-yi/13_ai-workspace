@@ -1,7 +1,7 @@
 import Step1 from "./components/Step1";
 import Step2 from "./components/Step2";
 import Step3 from "./components/Step3";
-
+import Practice from "./components/Practice";
 
 export default function Home() {
   return (
@@ -16,9 +16,10 @@ export default function Home() {
           </p>
         </header>
 
-        <Step1 />
-        {/* <Step2 /> */}
-        {/* <Step3 /> */}
+        {/* <Step1 /> */}
+        {/* <Step2/> */}
+        {/* <Step3/> */}
+        <Practice />
       </main>
     </div>
   );

@@ -1,8 +1,8 @@
-"use client";
+// 실습 탐지된 객체에 book 이 있을 경우 점수가 높은 (혹은 몇% 이상의 정확도 제한)crop 후 파일로 저장하기
 
-// 1. webcam 켜기(웹캠 스트림 연결) navigator.mediaDevices.getUserMedia 활용
-// 2. 실시간 웹캠 프레임 처리: requestAnimationFrame
-///   ==> 실시간 객체 탐지 결과 처리
+// 1. 스크린샵 캡쳐 버튼 활성 / 비활성 먼저 해보기
+
+"use client";
 
 import { useEffect, useRef, useState } from "react";
 import "@tensorflow/tfjs";
@@ -12,6 +12,13 @@ type DetectedObject = {
   bbox: [number, number, number, number];
   class: string;
   score: number;
+};
+
+type CapturedFile = {
+  id: number;
+  objectUrl: string;
+  blob: Blob;
+  filename: string;
 };
 
 export default function Step3() {
@@ -24,8 +31,7 @@ export default function Step3() {
 
   // 감지된 객체 목록
   const [detections, setDetections] = useState<DetectedObject[]>([]);
-
-  // 모델 참조
+  const [isCaptured, setIsCaptured] = useState<boolean>(false);
   const modelRef = useRef<cocoSsd.ObjectDetection | null>(null);
 
   // 비디오 요소 (<video />)
@@ -34,10 +40,11 @@ export default function Step3() {
   // requestAnimationFrame 루프 참조
   const refRef = useRef<number>(0);
 
-  // 마지막 감지 시간 기록 (FPS 조절용)
-  const lastDetectionTimeRef = useRef<number>(0);
-
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const [capturedFiles, setCapturedFiles] = useState<CapturedFile[]>([]);
+
+  const target = "cup";
 
   // 웹캠 켜기 버튼 클릭시 실행되는 함수 => 모델 로딩 및 웹캠 스트림 연결
   const startCamera = async () => {
@@ -65,6 +72,63 @@ export default function Step3() {
       );
       setStatus("error");
     }
+  };
+
+  const startCapture = async () => {
+    const canvas = canvasRef.current;
+
+    if (!canvas) return;
+    const targets = detections.filter((obj) => obj.class === target);
+
+    for (const targetDet of targets) {
+      // 여기서 각 person의 bbox로 crop 할 거야
+      const [x, y, width, height] = targetDet.bbox;
+
+      // 이미지
+
+      const tempCanvas = document.createElement("canvas");
+      tempCanvas.width = width;
+      tempCanvas.height = height;
+      const ctx = tempCanvas.getContext("2d");
+      if (!canvas) return;
+
+      const video = videoRef.current;
+      if (!video) return;
+      ctx?.drawImage(
+        video,
+        x,
+        y,
+        tempCanvas.width,
+        tempCanvas.height,
+        0,
+        0,
+        tempCanvas.width,
+        tempCanvas.height,
+      );
+
+      tempCanvas?.toBlob(
+        // toBlob: canvas 요소의 이미지를 Blob 형태로 변환하는 메서드
+        // - 변환된 Blob 형태의 파일을 처리할 콜백 함수
+        (blob) => {
+          if (!blob) return;
+          const filename = `${target}-capture-${Date.now()}.png`;
+          const objectUrl = URL.createObjectURL(blob); // Blob → 브라우저에서 쓸 수 있는 주소 생성
+          setCapturedFiles((prev) => [
+            ...prev,
+            { id: Date.now(), blob, filename, objectUrl },
+          ]);
+        },
+        "image/png", // 파일 형식
+        0.92, // 파일 품질 (0.0 ~ 1.0)
+      );
+    }
+  };
+
+  const startDownload = async (dataURL: string, index: number) => {
+    const a = document.createElement("a");
+    a.href = dataURL;
+    a.download = `${target} - ${index}.png`;
+    a.click();
   };
 
   // 컴포넌트 언마운트 시 : 웹캠 스트림 자원 반납, 모델 소스 해제 함수, 모델 리소스 반납, 웹캠 스트림 정리, 등
@@ -113,6 +177,8 @@ export default function Step3() {
           const [x, y, width, height] = detObj.bbox; // 바운딩박스 위치(x,y) 와 크기 (width, height)
           const label = `${detObj.class} ${(detObj.score * 100).toFixed(0)}%`;
 
+          setIsCaptured(false);
+
           // 사각형테두리(바운딩 박스)
           ctx.strokeStyle = "#00ff00";
           ctx.lineWidth = 3;
@@ -127,6 +193,9 @@ export default function Step3() {
           ctx.font = "bold 20px sans=serif";
           ctx.fillStyle = "#000";
           ctx.fillText(label, x + padding, y - 8);
+          if (detObj.class === target) {
+            setIsCaptured(true);
+          }
         }
       } catch (err) {
         console.error("탐지 오류:", err);
@@ -163,6 +232,8 @@ export default function Step3() {
     );
   }
 
+  // 탐색된 객체 중에 원하는 물건 있는지 탐색하는
+
   return (
     <div className="w-full max-w-2xl rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
       <h2 className="mb-2 text-lg font-semibold text-zinc-800 dark:text-zinc-100">
@@ -189,6 +260,32 @@ export default function Step3() {
           웹캠 켜기
         </button>
       )}
+      {isCaptured && (
+        <button
+          type="button"
+          onClick={startCapture}
+          className="rounded-lg bg-emerald-600 w-full my-4 px-1 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-600"
+        >
+          캡쳐하기
+        </button>
+      )}
+      <div className="flex gap-4 overflow-x-auto max-w-full">
+        {capturedFiles.map((capturedFile, index) => (
+          <div
+            key={index}
+            className="flex flex-col items-center flex-shrink-0 "
+          >
+            <img src={capturedFile.objectUrl} className="w-32 h-auto" />
+            <button
+              type="button"
+              onClick={() => startDownload(capturedFile.objectUrl, index)}
+              className="rounded-lg bg-emerald-600 w-32 my-4 px-1 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-600"
+            >
+              저장하기
+            </button>
+          </div>
+        ))}
+      </div>
 
       {status === "loading" && (
         <p className="text-sm text-zinc-600 dark:text-zinc-400">

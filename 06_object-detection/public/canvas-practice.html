@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <body>
+    <div style="position: relative">
+      <div style="width: 480px; height: 320px; background: beige"></div>
+      <canvas
+        id="myCanvas"
+        width="480"
+        height="320"
+        style="border: 1px solid #ccc; position: absolute; top: 0; left: 0"
+      >
+      </canvas>
+    </div>
+    <script>
+      const canvas = document.getElementById("myCanvas");
+      const ctx = canvas.getContext("2d");
+
+      // 사각형 그리기 - 라이브러리에 있는 함수 이용
+      ctx.strokeStyle = "#00ff00";
+      ctx.lineWidth = 3;
+      ctx.strokeRect(30, 30, 100, 70); //x,y, witdh, height
+      ctx.fillStyle = "#000fff";
+      ctx.fillRect(30, 30, 100, 70);
+
+      // 원그리기 - 함수 없음 => 경로 만들기 + stroke 또는 fill
+      ctx.beginPath();
+      ctx.arc(220, 70, 40, 0, Math.PI * 2); // 중심x, 중심y, 반지름, 시작각도, 끝각도
+      ctx.strokeStyle = "#E65924";
+      ctx.stroke();
+      ctx.fillStyle = "#eff844";
+      ctx.fill();
+
+      //선그리기
+      ctx.beginPath();
+      ctx.moveTo(150, 200);
+      ctx.lineTo(200, 250);
+      ctx.lineTo(230, 360);
+      ctx.stroke();
+
+      //텍스트 그리기
+      ctx.font = "bold 20px sans=serif";
+      ctx.fillStyle = "#222";
+      ctx.fillText("안녕", 20, 270);
+    </script>
+  </body>
+</html>
